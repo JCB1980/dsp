@@ -140,6 +140,7 @@ export async function importFile(file, mode = 'replace') {
     state.notice =
       `${result.entries.length} affectations importées` +
       (result.duplicates ? ` (${result.duplicates} lignes en double fusionnées)` : '') +
+      (result.absences ? ` · ${result.absences} absences (CP, RTT…) exclues` : '') +
       (mode === 'merge' ? ` · ${removed} affectations de la même période remplacées` : '') +
       '.';
   } catch (e) {

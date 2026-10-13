@@ -11,7 +11,7 @@ import OffersView from './components/OffersView.vue';
 import ImportPanel from './components/ImportPanel.vue';
 
 // Numéro de version affiché dans l'en-tête, pour vérifier quel fichier est ouvert.
-const VERSION = 'v1.5 · 13/10/2026';
+const VERSION = 'v1.6 · 13/10/2026';
 const importer = ref(null);
 const nf = new Intl.NumberFormat('fr-FR');
 const VIEWS = [
