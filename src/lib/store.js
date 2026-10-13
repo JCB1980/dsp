@@ -2,7 +2,7 @@ import { reactive, shallowRef, computed, markRaw } from 'vue';
 import * as db from './db.js';
 import { readPlanningFile } from './planningImport.js';
 import { DIMENSIONS, NONE, dataRange, valuesOf, computeDashboard, applyDimensionFilters, periodRange, inRange, budgetKey, offerComparison, isFilterActive } from './stats.js';
-import { parseOfferDocx, offerTotals, suggestTasks, suggestClient } from './offer.js';
+import { parseOfferDocx, offerTotals, matchTasks, suggestClient } from './offer.js';
 
 // Affectations : objets bruts (non réactifs en profondeur) pour la rapidité.
 const entries = shallowRef([]);
@@ -70,6 +70,7 @@ export async function init() {
     state.meta = saved.meta;
     state.budgets = saved.budgets;
     state.offers = saved.offers;
+    await refreshOfferLinks();
   } catch {
     state.storageOk = false;
   }
@@ -135,10 +136,7 @@ export async function importFile(file, mode = 'replace') {
     state.filters = emptyFilters();
     await persist({ entries: next, meta: JSON.parse(JSON.stringify(meta)) });
     // Nouvelles tâches au planning : on complète les rapprochements des offres.
-    if (state.offers.length) {
-      state.offers.forEach(o => autoAssignTasks(o));
-      await saveOffers();
-    }
+    await refreshOfferLinks();
     state.notice =
       `${result.entries.length} affectations importées` +
       (result.duplicates ? ` (${result.duplicates} lignes en double fusionnées)` : '') +
@@ -198,15 +196,50 @@ export function offerEntries(offer) {
   return entries.value.filter(e => valuesOf(e, offer.link.level).some(v => values.has(v)));
 }
 
-/** Propose les tâches du planning correspondant à chaque ligne encore vide. */
+/**
+ * Propose les tâches du planning pour les lignes encore vides : chaque tâche
+ * non encore rattachée va à la ligne dont le libellé est le plus proche.
+ */
 function autoAssignTasks(offer) {
-  const tasks = [...new Set(offerEntries(offer).map(e => e.task).filter(Boolean))];
   const taken = new Set(offer.lines.flatMap(l => l.tasks));
-  for (const line of offer.lines) {
-    if (line.tasks.length) continue;
-    line.tasks = suggestTasks(line.label, tasks.filter(t => !taken.has(t)));
-    line.tasks.forEach(t => taken.add(t));
+  const tasks = [...new Set(offerEntries(offer).map(e => e.task).filter(Boolean))].filter(t => !taken.has(t));
+  const empty = offer.lines.filter(l => !l.tasks.length);
+  const matches = matchTasks(empty, tasks);
+  for (const l of empty) l.tasks = matches.get(l.id) || [];
+}
+
+/**
+ * Offre jointe avant l'import du planning (ou client renommé) : on retente
+ * de la rattacher au client, puis au projet, du planning.
+ */
+function relinkOffer(offer) {
+  if (offer.link?.values?.length) return false;
+  for (const level of ['client', 'project']) {
+    const match = suggestClient(offer.info, options.value[level] || []);
+    if (match) {
+      offer.link = { level, values: [match] };
+      return true;
+    }
   }
+  return false;
+}
+
+/** Rattachements automatiques de toutes les offres (après import, au démarrage). */
+export async function refreshOfferLinks() {
+  if (!state.offers.length || !entries.value.length) return;
+  for (const o of state.offers) {
+    relinkOffer(o);
+    autoAssignTasks(o);
+  }
+  await saveOffers();
+}
+
+/** Bouton « Rattacher automatiquement » : relance le rapprochement des lignes vides. */
+export function autoLink(id) {
+  return updateOffer(id, o => {
+    relinkOffer(o);
+    autoAssignTasks(o);
+  });
 }
 
 /** Joint une offre (.docx) : analyse, rattachement automatique, enregistrement. */

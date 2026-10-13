@@ -56,6 +56,20 @@ function setQty(offer, line, ev) {
   });
 }
 const cols = computed(() => 10 + (showMoney.value ? 5 : 0) + (hasCost.value ? 2 : 0) + (props.editable ? 1 : 0));
+// Diagnostic : pourquoi des jours ne s'imputent pas sur les lignes.
+function issues({ offer, cmp, linked }) {
+  const out = [];
+  const who = offer.info.clientShort || offer.info.client || 'ce client';
+  if (!offer.link?.values?.length) out.push(`Offre non rattachée au planning : choisissez le client (ou le projet) correspondant à « ${who} » dans l'onglet Offres.`);
+  else if (!linked?.length) out.push(`Aucune affectation du planning pour « ${offer.link.values.join(', ')} » : vérifiez que l'export PlanningPME couvre ce client et la période du projet.`);
+  else {
+    const empty = cmp.lines.filter(l => !l.tasks.length).length;
+    if (cmp.totals.unassigned > 0)
+      out.push(`${fmtDays(cmp.totals.unassigned)} planifiés sur des tâches non rattachées à une ligne de l'offre (liste en bas) : rattachez-les dans la colonne « Tâches du planning » de l'onglet Offres.`);
+    else if (empty === cmp.lines.length) out.push('Aucune tâche du planning n\'est rattachée aux lignes de l\'offre.');
+  }
+  return out;
+}
 const stateLabel = l => (l.state === 'none' ? 'Aucune tâche' : BUDGET_STATES[l.state].label);
 </script>
 
@@ -103,7 +117,7 @@ const stateLabel = l => (l.state === 'none' ? 'Aucune tâche' : BUDGET_STATES[l.
             <th>État</th>
           </tr>
         </thead>
-        <tbody v-for="{ offer, cmp } in items" :key="offer.id">
+        <tbody v-for="{ offer, cmp, linked } in items" :key="offer.id">
           <tr v-if="showOffers" class="offer-row">
             <th class="first" colspan="3">
               {{ offer.info.clientShort || offer.link.values.join(', ') || 'Offre' }}
@@ -126,6 +140,9 @@ const stateLabel = l => (l.state === 'none' ? 'Aucune tâche' : BUDGET_STATES[l.
               <td class="r num" :class="{ neg: cmp.totals.soldAmount - cmp.totals.cost < 0 }">{{ money(cmp.totals.soldAmount - cmp.totals.cost) }}</td>
             </template>
             <td :colspan="editable ? 3 : 2"></td>
+          </tr>
+          <tr v-for="(msg, k) in issues({ offer, cmp, linked })" :key="'w' + k" class="issue">
+            <td class="first" :colspan="cols">⚠ {{ msg }}</td>
           </tr>
           <template v-for="p in cmp.phases" :key="offer.id + p.name">
             <tr class="phase">
@@ -352,6 +369,13 @@ thead .first {
 .offer-row .first {
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
   white-space: normal;
+}
+.issue td {
+  white-space: normal;
+  background: color-mix(in srgb, var(--warning) 16%, var(--surface));
+  color: var(--ink);
+  font-size: 13px;
+  position: static;
 }
 .phase th,
 .phase td {

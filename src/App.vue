@@ -63,7 +63,7 @@ onMounted(() => {
       </svg>
       <h1>Suivi des jours projets</h1>
     </div>
-    <nav v-if="allEntries.length || state.offers.length" class="tabs">
+    <nav v-if="state.ready" class="tabs">
       <button v-for="[k, l] in VIEWS" :key="k" :class="{ on: state.view === k }" @click="state.view = k">{{ l }}</button>
     </nav>
     <div class="right">

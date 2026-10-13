@@ -171,20 +171,61 @@ export const normalize = s =>
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
 
+// Mots vides ignorés dans les comparaisons de libellés.
+const STOP = new Set(['de', 'du', 'des', 'la', 'le', 'les', 'l', 'd', 'et', 'a', 'au', 'aux', 'en', 'pour', 'sur', 'un', 'une', 'avec', 'par']);
+const words = s => normalize(s).split(' ').filter(w => w.length > 1 && !STOP.has(w));
+
 /**
- * Rapprochement automatique ligne d'offre ↔ tâches du planning : libellés
- * identiques, ou l'un contenu dans l'autre (au moins 8 caractères).
+ * Similarité entre un libellé d'offre et une tâche du planning (0 à 1) :
+ * 1 si identiques ou si l'un contient l'autre (≥ 8 caractères), sinon la
+ * part de mots significatifs communs (rapportée au libellé le plus court).
  */
+export function labelScore(a, b) {
+  const x = normalize(a);
+  const y = normalize(b);
+  if (!x || !y) return 0;
+  if (x === y) return 1;
+  const [short, long] = x.length < y.length ? [x, y] : [y, x];
+  if (short.length >= 8 && long.includes(short)) return 0.95;
+  const wa = new Set(words(a));
+  const wb = new Set(words(b));
+  if (!wa.size || !wb.size) return 0;
+  // Mots proches : même racine sur 5 lettres (paramétrage / paramétrer).
+  const stem = w => w.slice(0, 5);
+  const sb = new Set([...wb].map(stem));
+  let common = 0;
+  for (const w of wa) if (wb.has(w) || sb.has(stem(w))) common++;
+  if (common < 2 && Math.min(wa.size, wb.size) > 1) return 0;
+  return common / Math.min(wa.size, wb.size);
+}
+
+export const MATCH_THRESHOLD = 0.6;
+
+/**
+ * Rapprochement automatique : chaque tâche du planning est proposée à la
+ * ligne d'offre dont le libellé est le plus proche (score ≥ seuil).
+ * `lines` : [{ id, label }] ; retourne Map<lineId, tâches[]>.
+ */
+export function matchTasks(lines, taskNames) {
+  const out = new Map(lines.map(l => [l.id, []]));
+  for (const t of taskNames) {
+    let best = null;
+    let bestScore = MATCH_THRESHOLD;
+    for (const l of lines) {
+      const sc = labelScore(l.label, t);
+      if (sc >= bestScore && (!best || sc > bestScore)) {
+        best = l;
+        bestScore = sc;
+      }
+    }
+    if (best) out.get(best.id).push(t);
+  }
+  return out;
+}
+
+/** Compatibilité : tâches proches d'un libellé. */
 export function suggestTasks(label, taskNames) {
-  const l = normalize(label);
-  if (!l) return [];
-  return taskNames.filter(t => {
-    const n = normalize(t);
-    if (!n) return false;
-    if (n === l) return true;
-    const [short, long] = n.length < l.length ? [n, l] : [l, n];
-    return short.length >= 8 && long.includes(short);
-  });
+  return taskNames.filter(t => labelScore(label, t) >= MATCH_THRESHOLD);
 }
 
 /** Le client du planning qui correspond le mieux à l'offre. */

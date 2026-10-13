@@ -11,6 +11,7 @@ import {
   offerEntries,
   offerFile,
   setOfferLink,
+  autoLink,
   convertToDays,
   exportBackup,
   importBackup
@@ -166,6 +167,7 @@ async function restoreBackup(ev) {
               @update:model-value="v => setOfferLink(offer.id, offer.link.level, v)"
             />
           </div>
+          <button class="btn" title="Retente le rattachement du client et des tâches aux lignes encore vides" @click="autoLink(offer.id)">Rattacher automatiquement</button>
           <p v-if="!offer.link.values.length" class="warn-text">⚠ Choisissez le client (ou le projet / la commande) du planning qui correspond à cette offre.</p>
           <p v-else class="muted small">{{ linked.length }} affectations du planning rattachées · réalisé au {{ formatDate(refDate) }}</p>
         </div>

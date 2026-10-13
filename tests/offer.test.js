@@ -85,3 +85,26 @@ describe('offre financière (.docx)', () => {
     expect(c.totals).toMatchObject({ sold: 45.5, done: 10.5, planned: 6, unassigned: 0.5 });
   });
 });
+
+import { labelScore, matchTasks } from '../src/lib/offer.js';
+
+describe('rapprochement tolérant des libellés', () => {
+  it('reconnaît des libellés proches mais non identiques', () => {
+    expect(labelScore('Formation des utilisateurs PEP', 'Formation utilisateurs PEP - session 1')).toBeGreaterThanOrEqual(0.6);
+    expect(labelScore('Ateliers de paramétrage PEP', 'Ateliers paramétrage')).toBeGreaterThanOrEqual(0.6);
+    expect(labelScore('Bascule et Reprises', 'Reprise des données / bascule')).toBeGreaterThanOrEqual(0.6);
+    expect(labelScore('Formation équipe projet PEP', 'Réunion interne PEP')).toBe(0);
+  });
+
+  it('attribue chaque tâche à la ligne la plus proche', () => {
+    const lines = [
+      { id: 'a', label: 'Paramétrage de la solution PEP' },
+      { id: 'b', label: 'Dossier de paramétrage PEP' },
+      { id: 'c', label: 'Formation des utilisateurs PEP' }
+    ];
+    const m = matchTasks(lines, ['Paramétrage solution PEP', 'Rédaction dossier paramétrage', 'Formation utilisateurs', 'Réunion interne']);
+    expect(m.get('a')).toEqual(['Paramétrage solution PEP']);
+    expect(m.get('b')).toEqual(['Rédaction dossier paramétrage']);
+    expect(m.get('c')).toEqual(['Formation utilisateurs']);
+  });
+});

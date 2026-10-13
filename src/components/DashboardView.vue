@@ -45,7 +45,7 @@ const cards = computed(() =>
 // Suivi par ligne d'offre (offres jointes dans l'onglet « Offres & jours vendus »).
 const tracking = computed(() => offerTracking.value);
 const offerKpis = computed(() => {
-  const t = { sold: 0, done: 0, planned: 0, raf: 0, soldAmount: 0, rafAmount: 0 };
+  const t = { sold: 0, done: 0, planned: 0, raf: 0, soldAmount: 0, rafAmount: 0, outside: 0 };
   for (const { cmp } of tracking.value) {
     t.sold += cmp.totals.sold;
     t.done += cmp.totals.linesDone;
@@ -53,6 +53,7 @@ const offerKpis = computed(() => {
     t.raf += cmp.totals.raf;
     t.soldAmount += cmp.totals.soldAmount;
     t.rafAmount += cmp.totals.rafAmount;
+    t.outside += cmp.totals.unassigned;
   }
   return t;
 });
@@ -98,7 +99,7 @@ const periodLabel = computed(() => {
       </header>
       <div v-if="tracking.length" class="oc-kpis">
         <div><span class="muted">Jours vendus</span><strong>{{ fmtDays(offerKpis.sold) }}</strong><span class="muted">{{ eur.format(offerKpis.soldAmount) }}</span></div>
-        <div><span class="muted">Consommé</span><strong>{{ fmtDays(offerKpis.done) }}</strong><span class="muted">{{ offerKpis.sold ? pf.format(offerKpis.done / offerKpis.sold) : '' }} du vendu</span></div>
+        <div><span class="muted">Consommé</span><strong>{{ fmtDays(offerKpis.done) }}</strong><span class="muted">{{ offerKpis.sold ? pf.format(offerKpis.done / offerKpis.sold) : '' }} du vendu<template v-if="offerKpis.outside"> · + {{ fmtDays(offerKpis.outside) }} hors offre</template></span></div>
         <div><span class="muted">À venir</span><strong>{{ fmtDays(offerKpis.planned) }}</strong></div>
         <div><span class="muted">Reste à faire</span><strong>{{ fmtDays(offerKpis.raf) }}</strong><span class="muted">{{ eur.format(offerKpis.rafAmount) }}</span></div>
         <div>
