@@ -10,6 +10,8 @@ import LinesView from './components/LinesView.vue';
 import OffersView from './components/OffersView.vue';
 import ImportPanel from './components/ImportPanel.vue';
 
+// Numéro de version affiché dans l'en-tête, pour vérifier quel fichier est ouvert.
+const VERSION = 'v1.4 · 13/10/2026';
 const importer = ref(null);
 const nf = new Intl.NumberFormat('fr-FR');
 const VIEWS = [
@@ -62,6 +64,7 @@ onMounted(() => {
         <path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7" stroke-linecap="round" />
       </svg>
       <h1>Suivi des jours projets</h1>
+      <span class="version" title="Version de l'application">{{ VERSION }}</span>
     </div>
     <nav v-if="state.ready" class="tabs">
       <button v-for="[k, l] in VIEWS" :key="k" :class="{ on: state.view === k }" @click="state.view = k">{{ l }}</button>
@@ -134,6 +137,13 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   color: var(--accent);
+}
+.version {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
 }
 .brand h1 {
   font-size: 17px;
