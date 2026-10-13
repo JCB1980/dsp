@@ -1,6 +1,8 @@
 // Stockage local (IndexedDB) : les données restent sur le poste, dans le
 // navigateur. Un seul magasin clé → valeur : « entries » (affectations
-// importées, en un bloc), « meta » (import) et « budgets » (jours vendus).
+// importées, en un bloc), « meta » (import), « budgets » (jours vendus saisis),
+// « offers » (offres financières analysées) et « offerFile:<id> » (le fichier
+// .docx d'origine de chaque offre, chargé uniquement à la demande).
 const DB_NAME = 'dsp-suivi-jours';
 const STORE = 'kv';
 
@@ -38,12 +40,12 @@ function tx(mode, fn) {
 export async function loadAll() {
   const out = {};
   await tx('readonly', store => {
-    for (const key of ['entries', 'meta', 'budgets']) {
+    for (const key of ['entries', 'meta', 'budgets', 'offers']) {
       const r = store.get(key);
       r.onsuccess = () => (out[key] = r.result);
     }
   });
-  return { entries: out.entries || [], meta: out.meta || null, budgets: out.budgets || {} };
+  return { entries: out.entries || [], meta: out.meta || null, budgets: out.budgets || {}, offers: out.offers || [] };
 }
 
 export function save(values) {
@@ -56,5 +58,20 @@ export function clearData() {
   return tx('readwrite', store => {
     store.delete('entries');
     store.delete('meta');
+  });
+}
+
+export async function get(key) {
+  let value;
+  await tx('readonly', store => {
+    const r = store.get(key);
+    r.onsuccess = () => (value = r.result);
+  });
+  return value;
+}
+
+export function remove(key) {
+  return tx('readwrite', store => {
+    store.delete(key);
   });
 }

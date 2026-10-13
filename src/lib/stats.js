@@ -314,3 +314,79 @@ export const BUDGET_STATES = {
   ok: { label: 'Dans le budget', icon: '✓', color: 'var(--good)' },
   none: { label: 'Sans budget', icon: '–', color: 'var(--axis)' }
 };
+
+// --- Offres financières : jours vendus ↔ jours planifiés --------------------
+
+/**
+ * Compare chaque ligne d'une offre (jours vendus) aux affectations du
+ * planning rattachées (via les tâches associées à la ligne).
+ */
+export function offerComparison(offer, linked, refDate) {
+  const byTask = new Map();
+  for (const e of linked) {
+    const key = e.task || NONE;
+    let t = byTask.get(key);
+    if (!t) byTask.set(key, (t = { done: 0, planned: 0, resources: new Set() }));
+    if (e.date <= refDate) t.done += e.totalDays;
+    else t.planned += e.totalDays;
+    if (!e.unplanned) t.resources.add(e.resource);
+  }
+  const assigned = new Set();
+  const lines = offer.lines.map(l => {
+    let done = 0;
+    let planned = 0;
+    const resources = new Set();
+    for (const task of l.tasks) {
+      assigned.add(task);
+      const t = byTask.get(task);
+      if (!t) continue;
+      done += t.done;
+      planned += t.planned;
+      t.resources.forEach(r => resources.add(r));
+    }
+    const sold = l.qty || 0;
+    const total = done + planned;
+    const state = !l.tasks.length ? 'none' : done > sold ? 'over' : total > sold ? 'risk' : sold && total / sold >= 0.8 ? 'watch' : 'ok';
+    return {
+      ...l,
+      sold,
+      done,
+      planned,
+      total,
+      remaining: sold - total,
+      soldAmount: l.amount ?? sold * (l.unitPrice || 0),
+      doneAmount: done * (l.unitPrice || 0),
+      resources: [...resources].join(', '),
+      state
+    };
+  });
+  const unassigned = [...byTask.entries()]
+    .filter(([task]) => !assigned.has(task))
+    .map(([task, t]) => ({ task, done: t.done, planned: t.planned, total: t.done + t.planned, resources: [...t.resources].join(', ') }))
+    .sort((a, b) => b.total - a.total);
+  const sum = (list, f) => list.reduce((s, x) => s + f(x), 0);
+  const phases = [];
+  for (const l of lines) {
+    let p = phases.find(x => x.name === l.phase);
+    if (!p) phases.push((p = { name: l.phase, lines: [] }));
+    p.lines.push(l);
+  }
+  for (const p of phases) {
+    p.sold = sum(p.lines, l => l.sold);
+    p.done = sum(p.lines, l => l.done);
+    p.planned = sum(p.lines, l => l.planned);
+  }
+  return {
+    phases,
+    lines,
+    unassigned,
+    totals: {
+      sold: sum(lines, l => l.sold),
+      soldAmount: sum(lines, l => l.soldAmount),
+      done: sum(linked.filter(e => e.date <= refDate), e => e.totalDays),
+      planned: sum(linked.filter(e => e.date > refDate), e => e.totalDays),
+      doneAmount: sum(lines, l => l.doneAmount),
+      unassigned: sum(unassigned, u => u.total)
+    }
+  };
+}
