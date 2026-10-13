@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { allEntries, availableDimensions, refDate, state, setBudget, replaceBudgets } from '../lib/store.js';
+import { allEntries, availableDimensions, refDate, state, setBudget, replaceBudgets, effectiveBudgets, offerBudgets } from '../lib/store.js';
 import { BUDGET_LEVELS, BUDGET_STATES, budgetRows, budgetKey, fmtDays } from '../lib/stats.js';
 import { formatDate } from '../lib/dates.js';
 import { toCsv, download, csvNumber, stamp, parseCsv } from '../lib/exportCsv.js';
@@ -23,7 +23,12 @@ const stateFilter = ref('');
 const search = ref('');
 const pf = new Intl.NumberFormat('fr-FR', { style: 'percent', maximumFractionDigits: 0 });
 
-const all = computed(() => budgetRows(allEntries.value, level.value, state.budgets, refDate.value));
+// Budget = saisie manuelle, sinon jours vendus de l'offre rattachée.
+const all = computed(() => budgetRows(allEntries.value, level.value, effectiveBudgets.value, refDate.value));
+const fromOffer = r => {
+  const k = budgetKey(level.value, r.name);
+  return state.budgets[k] == null && offerBudgets.value[k] != null;
+};
 const rows = computed(() => {
   const q = search.value.trim().toLowerCase();
   return all.value
@@ -135,7 +140,8 @@ async function importBudgets(ev) {
     </div>
 
     <p class="muted hint">
-      Saisissez le nombre de <strong>jours vendus</strong> dans la colonne Budget : la consommation est calculée sur toutes les données importées
+      Saisissez le nombre de <strong>jours vendus</strong> dans la colonne Budget, ou joignez l'offre financière dans l'onglet « Offres & jours
+      vendus » (budget affiché « (offre) ») : la consommation est calculée sur toutes les données importées
       (indépendamment des filtres), réalisé jusqu'au {{ formatDate(refDate) }}.
       <template v-if="totals.n">
         Sur les {{ totals.n }} {{ levelLabel.toLowerCase() }}s budgétés : {{ fmtDays(totals.done) }} réalisés et {{ fmtDays(totals.total) }} planifiés pour {{ fmtDays(totals.budget) }} vendus.
@@ -170,9 +176,9 @@ async function importBudgets(ev) {
                 min="0"
                 step="0.5"
                 inputmode="decimal"
-                :value="r.budget ?? ''"
+                :value="fromOffer(r) ? '' : r.budget ?? ''"
+                :placeholder="fromOffer(r) ? `${r.budget} (offre)` : '—'"
                 :aria-label="`Budget en jours pour ${r.name}`"
-                placeholder="—"
                 @change="onBudget(r, $event)"
               />
             </td>

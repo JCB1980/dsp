@@ -7,14 +7,18 @@ import DashboardView from './components/DashboardView.vue';
 import PivotView from './components/PivotView.vue';
 import BudgetView from './components/BudgetView.vue';
 import LinesView from './components/LinesView.vue';
+import OffersView from './components/OffersView.vue';
 import ImportPanel from './components/ImportPanel.vue';
 
+// Numéro de version affiché dans l'en-tête, pour vérifier quel fichier est ouvert.
+const VERSION = 'v1.6 · 13/10/2026';
 const importer = ref(null);
 const nf = new Intl.NumberFormat('fr-FR');
 const VIEWS = [
   ['dashboard', 'Tableau de bord'],
   ['pivot', 'Analyse croisée'],
   ['budgets', 'Suivi des budgets'],
+  ['offers', 'Offres & jours vendus'],
   ['lines', 'Détail']
 ];
 
@@ -60,8 +64,9 @@ onMounted(() => {
         <path d="M3 9h18M8 2v4M16 2v4M7 13h4M7 17h7" stroke-linecap="round" />
       </svg>
       <h1>Suivi des jours projets</h1>
+      <span class="version" title="Version de l'application">{{ VERSION }}</span>
     </div>
-    <nav v-if="allEntries.length" class="tabs">
+    <nav v-if="state.ready" class="tabs">
       <button v-for="[k, l] in VIEWS" :key="k" :class="{ on: state.view === k }" @click="state.view = k">{{ l }}</button>
     </nav>
     <div class="right">
@@ -93,17 +98,18 @@ onMounted(() => {
       <button class="btn ghost" @click="state.notice = ''">Fermer</button>
     </p>
 
-    <section v-if="state.ready && !allEntries.length && !state.importing" class="welcome">
+    <section v-if="state.ready && !allEntries.length && !state.importing && state.view !== 'offers'" class="welcome">
       <h2>Bienvenue</h2>
       <p class="muted">
-        Importez l'export Excel de PlanningPME pour suivre la consommation des jours par consultant, client, projet et commande. Vous
-        pourrez ensuite saisir les jours vendus pour suivre chaque budget.
+        Importez l'export Excel de PlanningPME pour suivre la consommation des jours par consultant, client, projet et commande. Joignez
+        ensuite les offres financières (Word) pour comparer les jours planifiés aux jours vendus.
       </p>
     </section>
 
-    <ImportPanel ref="importer" :compact="allEntries.length > 0" />
+    <ImportPanel ref="importer" :compact="allEntries.length > 0 || state.view === 'offers'" />
 
-    <template v-if="allEntries.length && !state.importing">
+    <OffersView v-if="state.view === 'offers' && !state.importing" />
+    <template v-else-if="allEntries.length && !state.importing">
       <FilterBar v-if="state.view !== 'budgets'" />
       <DashboardView v-if="state.view === 'dashboard'" />
       <PivotView v-else-if="state.view === 'pivot'" />
@@ -131,6 +137,13 @@ onMounted(() => {
   align-items: center;
   gap: 10px;
   color: var(--accent);
+}
+.version {
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
 }
 .brand h1 {
   font-size: 17px;

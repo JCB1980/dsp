@@ -7,7 +7,8 @@ const props = defineProps({
   modelValue: { type: Array, default: () => [] },
   options: { type: Array, default: () => [] },
   presets: { type: Array, default: () => [] }, // [{ label, values }]
-  labelledBy: { type: String, default: '' }
+  labelledBy: { type: String, default: '' },
+  emptyLabel: { type: String, default: 'Tous' } // libellé quand rien n'est coché
 });
 const emit = defineEmits(['update:modelValue']);
 
@@ -52,8 +53,9 @@ async function toggleOpen() {
 const selected = computed(() => new Set(props.modelValue));
 const summary = computed(() => {
   const n = props.modelValue.length;
-  if (!n || n === props.options.length) return 'Tous';
+  if (!n) return props.emptyLabel;
   if (n === 1) return props.modelValue[0];
+  if (n === props.options.length && props.emptyLabel === 'Tous') return 'Tous';
   return `${n} sélectionnés`;
 });
 

@@ -73,6 +73,7 @@ export function rowsToEntries(rows, date1904 = false) {
   const entries = [];
   const seen = new Map();
   let duplicates = 0;
+  let absences = 0;
 
   for (const row of rows.slice(1)) {
     if (!row || !row.length) continue;
@@ -80,6 +81,11 @@ export function rowsToEntries(rows, date1904 = false) {
     const resource = clean(get(row, 'Res_Label'));
     const date = dateOf(get(row, 'Dat_StartDate'), date1904);
     if (!eventKey || !resource || date == null) continue;
+    // Absences (CP, RTT, jours fériés) : ne sont pas des jours projet.
+    if (/^indisponibilit/i.test(clean(get(row, 'Evt_Type')))) {
+      absences++;
+      continue;
+    }
 
     const start = hourOf(get(row, 'Dat_StartHour'));
     const end = hourOf(get(row, 'Dat_EndHour'));
@@ -105,10 +111,15 @@ export function rowsToEntries(rows, date1904 = false) {
     const entry = {
       id,
       eventKey,
-      task: clean(get(row, 'Evt_Label')),
+      // Objet de la prestation : le sous-projet (Sub_Label) quand il existe,
+      // sinon le nom de l'événement. C'est le libellé repris par l'offre.
+      task: clean(get(row, 'Sub_Label')) || clean(get(row, 'Evt_Label')),
+      // Prix unitaire et durée vendue du sous-projet, pour contrôle.
+      subUnitPrice: num(get(row, 'Sub_PRIXUNIT')) || null,
       category: clean(get(row, 'Evt_Category')),
       status: STATUSES[rawStatus] || rawStatus,
-      order: clean(get(row, 'Evt_Order')),
+      // Commande : n° d'événement, sinon n° de commande du projet (Pro_NUMBC).
+      order: clean(get(row, 'Evt_Order')) || clean(get(row, 'Pro_NUMBC')),
       billingType: clean(get(row, 'Evt_BillingType')),
       remark: clean(get(row, 'Evt_Remark')),
       date,
@@ -119,6 +130,8 @@ export function rowsToEntries(rows, date1904 = false) {
       hours,
       hoursExtra,
       totalDays: days + daysExtra,
+      // Coût interne calculé par PlanningPME (coût de la ressource), s'il est renseigné.
+      cost: num(get(row, 'Dat_Cost')),
       totalHours: hours + hoursExtra,
       resource,
       resourceKey,
@@ -138,14 +151,14 @@ export function rowsToEntries(rows, date1904 = false) {
   for (const e of entries) {
     e.departments = [...new Set(e.departments.flatMap(d => d.split(/\s*,\s*/)).filter(Boolean))];
   }
-  return { entries, duplicates };
+  return { entries, duplicates, absences };
 }
 
 export async function readPlanningFile(file) {
   if (!/\.xlsx$/i.test(file.name)) throw new Error('Format non reconnu : importez le fichier Excel (.xlsx) exporté de PlanningPME.');
   const wb = openWorkbook(new Uint8Array(await file.arrayBuffer()));
   const { name, rows } = findDataSheet(wb);
-  const { entries, duplicates } = rowsToEntries(rows, wb.date1904);
+  const { entries, duplicates, absences } = rowsToEntries(rows, wb.date1904);
   if (!entries.length) throw new Error(`Aucune ligne exploitable dans l'onglet « ${name} ».`);
   let from = Infinity;
   let to = -Infinity;
@@ -153,5 +166,5 @@ export async function readPlanningFile(file) {
     if (e.date < from) from = e.date;
     if (e.date > to) to = e.date;
   }
-  return { entries, duplicates, sheet: name, from, to };
+  return { entries, duplicates, absences, sheet: name, from, to };
 }

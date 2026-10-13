@@ -16,12 +16,21 @@ Application **locale**, à ouvrir dans le navigateur, pour suivre les jours cons
 
 | Écran | Contenu |
 |---|---|
-| **Tableau de bord** | Jours consommés (réalisés), jours à venir, total, taux d'occupation, heures supplémentaires et week-ends, jours à planifier ; charge par semaine ou par mois ; jours par consultant, client, projet, commande, tâche et département. Un clic sur une barre filtre l'ensemble. |
+| **Tableau de bord** | **Suivi par ligne d'offre** (toutes les offres jointes, filtrables par client, projet ou commande) : pour chaque prestation, jours vendus, réalisé, à venir, **reste à faire** (vendus − réalisé), écart prévisionnel (vendus − réalisé − à venir), puis les **coûts en € HT au TJM de la ligne, repris de l'offre** (colonne P.U., modifiable dans l'onglet Offres en cas d'avenant), et le **coût interne et la marge** si PlanningPME exporte les coûts des ressources (`Dat_Cost`). Sous-totaux par offre et par phase, export CSV. Ensuite : jours consommés (réalisés), jours à venir, total, taux d'occupation, heures supplémentaires et week-ends, jours à planifier ; charge par semaine ou par mois ; jours par consultant, client, projet, commande, tâche et département. Un clic sur une barre filtre l'ensemble. |
 | **Analyse croisée** | Tableau croisé au choix : lignes, sous-lignes repliables, colonnes (mois, semaine ou un autre axe), en jours ou en heures, réalisé et/ou à venir. Export CSV. |
 | **Suivi des budgets** | Par commande, projet ou client : saisie des **jours vendus**, puis réalisé, à venir, reste, % consommé et % projeté, avec un état (Dépassé, Dépassement prévu, Vigilance ≥ 80 %, Dans le budget). Les budgets peuvent être sauvegardés et restaurés en CSV. |
+| **Offres & jours vendus** | L'utilisateur **joint l'offre financière** (.docx), qui est enregistrée sur le poste avec son fichier d'origine (bouton « Ouvrir l'offre »). Les prestations vendues en jours sont lues dans le tableau récapitulatif (Qté, Profil, P.U.), puis comparées ligne à ligne aux jours planifiés : vendus, réalisé, à venir, reste, réalisé valorisé en €, état. Les **prestations au forfait** peuvent être **déclinées en jours/homme** (TJM implicite = montant ÷ jours) pour être suivies elles aussi, et la déclinaison peut être annulée. |
 | **Détail** | Toutes les affectations journalières, avec recherche, tri et export CSV. |
 
 **Date de référence** (dans les filtres) : les jours jusqu'à cette date sont comptés comme *réalisés*, les suivants comme *à venir*. Par défaut, c'est la date du jour.
+
+## Offres financières
+
+1. Dans l'onglet **Offres & jours vendus**, cliquez sur **Joindre une offre (.docx)**, ou glissez le fichier dans la page.
+2. L'offre est rattachée automatiquement au **client** du planning qui porte le même nom (par exemple « MUCEM »). Vous pouvez changer ce rattachement pour un client, un projet ou une commande.
+3. Chaque prestation est reliée aux **tâches du planning** dont le libellé correspond (par exemple « Formation des utilisateurs PEP »). Vous pouvez ajuster ces liens. Les tâches qui ne correspondent à aucune prestation apparaissent dans « Tâches non rattachées ».
+4. Les jours vendus de l'offre servent aussi de budget dans **Suivi des budgets**, sauf si un budget a été saisi à la main.
+5. **Sauvegarder** télécharge un fichier .json qui contient les offres, avec leurs documents, et les budgets. **Restaurer** le recharge, sur ce poste ou sur un autre.
 
 ## Règles de calcul
 
