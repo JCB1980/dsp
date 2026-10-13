@@ -119,6 +119,8 @@ export function rowsToEntries(rows, date1904 = false) {
       hours,
       hoursExtra,
       totalDays: days + daysExtra,
+      // Coût interne calculé par PlanningPME (coût de la ressource), s'il est renseigné.
+      cost: num(get(row, 'Dat_Cost')),
       totalHours: hours + hoursExtra,
       resource,
       resourceKey,

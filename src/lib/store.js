@@ -1,7 +1,7 @@
 import { reactive, shallowRef, computed, markRaw } from 'vue';
 import * as db from './db.js';
 import { readPlanningFile } from './planningImport.js';
-import { DIMENSIONS, NONE, dataRange, valuesOf, computeDashboard, applyDimensionFilters, periodRange, inRange, budgetKey } from './stats.js';
+import { DIMENSIONS, NONE, dataRange, valuesOf, computeDashboard, applyDimensionFilters, periodRange, inRange, budgetKey, offerComparison, isFilterActive } from './stats.js';
 import { parseOfferDocx, offerTotals, suggestTasks, suggestClient } from './offer.js';
 
 // Affectations : objets bruts (non réactifs en profondeur) pour la rapidité.
@@ -366,3 +366,27 @@ export async function importBackup(text) {
   state.selectedOffer = values.offers[0]?.id || null;
   return values.offers.length;
 }
+
+/**
+ * Suivi consolidé par ligne d'offre pour le tableau de bord. Les filtres
+ * Client / Projet / Commande choisissent les offres affichées (via leur
+ * rattachement au planning) ; la comparaison porte sur toute la durée de
+ * l'affaire, indépendamment de la période.
+ */
+export const offerTracking = computed(() => {
+  const f = state.filters;
+  const scope = ['client', 'project', 'order'].filter(k => isFilterActive(f[k]));
+  // Valeurs rattachées : on relit les affectations pour connaître les clients /
+  // projets / commandes réellement couverts par chaque offre.
+  return state.offers
+    .map(offer => {
+      const linked = offerEntries(offer);
+      return { offer, linked, cmp: offerComparison(offer, linked, refDate.value) };
+    })
+    .filter(({ linked }) =>
+      scope.every(k => {
+        const wanted = new Set(f[k]);
+        return linked.some(e => valuesOf(e, k).some(v => wanted.has(v)));
+      })
+    );
+});

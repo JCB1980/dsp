@@ -11,19 +11,18 @@ import {
   offerEntries,
   offerFile,
   setOfferLink,
-  setLineTasks,
-  updateOffer,
   convertToDays,
-  revertToForfait,
   exportBackup,
   importBackup
 } from '../lib/store.js';
-import { offerComparison, BUDGET_LEVELS, BUDGET_STATES, fmtDays } from '../lib/stats.js';
+import { offerComparison, BUDGET_LEVELS, fmtDays } from '../lib/stats.js';
 import { offerTotals } from '../lib/offer.js';
 import { formatDate } from '../lib/dates.js';
-import { download, stamp, toCsv, csvNumber } from '../lib/exportCsv.js';
+import { download, stamp } from '../lib/exportCsv.js';
+import { offerLinesCsv } from '../lib/offerExport.js';
 import MultiSelect from './MultiSelect.vue';
 import StatTile from './StatTile.vue';
+import OfferLinesTable from './OfferLinesTable.vue';
 
 // Offres financières : l'utilisateur joint l'offre (.docx), elle est
 // enregistrée sur le poste, et ses jours vendus sont comparés au planning.
@@ -83,41 +82,9 @@ async function downloadFile(o) {
 async function remove(o) {
   if (confirm(`Supprimer l'offre « ${o.name} » et son fichier de ce poste ?`)) await deleteOffer(o.id);
 }
-function setQty(line, ev) {
-  const v = Number(String(ev.target.value).replace(',', '.'));
-  if (!Number.isFinite(v) || v < 0) return;
-  updateOffer(offer.value.id, o => {
-    const l = o.lines.find(x => x.id === line.id);
-    l.qty = v;
-    if (l.unitPrice != null) l.amount = v * l.unitPrice;
-  });
-}
-
-// Barre : réalisé + à venir sur l'échelle des jours vendus.
-function meter(l) {
-  const scale = Math.max(l.sold, l.total) || 1;
-  return { done: (l.done / scale) * 100, planned: (l.planned / scale) * 100, sold: (l.sold / scale) * 100 };
-}
 
 function exportCsv() {
-  const header = ['Phase', 'Prestation', 'Profil', 'P.U. (€ HT)', 'Jours vendus', 'Réalisé (j)', 'À venir (j)', 'Reste (j)', 'Montant vendu (€ HT)', 'Réalisé valorisé (€ HT)', 'Tâches du planning', 'Consultants', 'État'];
-  const rows = cmp.value.lines.map(l => [
-    l.phase,
-    l.label,
-    l.profile,
-    csvNumber(l.unitPrice),
-    csvNumber(l.sold),
-    csvNumber(l.done),
-    csvNumber(l.planned),
-    csvNumber(l.remaining),
-    csvNumber(l.soldAmount),
-    csvNumber(l.doneAmount),
-    l.tasks.join(', '),
-    l.resources,
-    BUDGET_STATES[l.state].label
-  ]);
-  for (const u of cmp.value.unassigned) rows.push(['(non rattaché à l\'offre)', u.task, '', '', '', csvNumber(u.done), csvNumber(u.planned), '', '', '', u.task, u.resources, '']);
-  download(toCsv(header, rows), `offre-${(offer.value.info.clientShort || 'client').toLowerCase()}-${stamp()}.csv`);
+  download(offerLinesCsv([{ offer: offer.value, cmp: cmp.value }]), `offre-${(offer.value.info.clientShort || 'client').toLowerCase()}-${stamp()}.csv`);
 }
 
 const backupMsg = ref('');
@@ -208,95 +175,20 @@ async function restoreBackup(ev) {
         <StatTile hero label="Jours vendus" :value="fmtDays(cmp.totals.sold)" :note="`${eur.format(cmp.totals.soldAmount)} HT de prestations`" />
         <StatTile label="Jours réalisés" :value="fmtDays(cmp.totals.done)" :note="cmp.totals.sold ? `${pf.format(cmp.totals.done / cmp.totals.sold)} des jours vendus` : ''" />
         <StatTile label="Jours planifiés à venir" :value="fmtDays(cmp.totals.planned)" note="après la date de référence" />
+        <StatTile label="Reste à faire" :value="fmtDays(cmp.totals.raf)" :note="`${eur.format(cmp.totals.rafAmount)} HT · vendus – réalisé`" />
         <StatTile
-          label="Reste à planifier"
+          label="Écart prévisionnel"
           :value="fmtDays(cmp.totals.sold - cmp.totals.done - cmp.totals.planned)"
           :note="cmp.totals.sold - cmp.totals.done - cmp.totals.planned < 0 ? 'planifié au-delà du vendu' : 'vendus – (réalisé + à venir)'"
         />
-        <StatTile label="Réalisé valorisé" :value="eur.format(cmp.totals.doneAmount)" note="jours réalisés × prix unitaire de la ligne" />
         <StatTile label="Hors offre" :value="fmtDays(cmp.totals.unassigned)" note="tâches planifiées non rattachées" />
       </div>
 
       <section class="card table-card">
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Prestation</th>
-                <th>Profil</th>
-                <th class="r">P.U.</th>
-                <th class="r">Vendus</th>
-                <th class="r">Réalisé</th>
-                <th class="r">À venir</th>
-                <th class="r">Reste</th>
-                <th class="meter-col">Consommation</th>
-                <th>Tâches du planning</th>
-                <th>État</th>
-              </tr>
-            </thead>
-            <tbody v-for="p in cmp.phases" :key="p.name">
-              <tr class="phase">
-                <th colspan="3">{{ p.name || 'Prestations' }}</th>
-                <td class="r num">{{ fmtDays(p.sold) }}</td>
-                <td class="r num">{{ fmtDays(p.done) }}</td>
-                <td class="r num">{{ fmtDays(p.planned) }}</td>
-                <td colspan="4"></td>
-              </tr>
-              <tr v-for="l in p.lines" :key="l.id">
-                <td class="label">
-                  {{ l.label }}
-                  <span v-if="l.forfait" class="forfait-tag" :title="`Forfait de ${eur.format(l.forfait.amount)} décliné en ${l.qty} jours/homme`">
-                    forfait {{ l.forfait.amount == null ? '' : eur.format(l.forfait.amount) }}
-                    <button class="undo" title="Annuler la déclinaison : revenir au forfait" @click="revertToForfait(offer.id, l.id)">↩</button>
-                  </span>
-                  <span v-if="l.resources" class="muted sub">{{ l.resources }}</span>
-                </td>
-                <td>{{ l.profile }}</td>
-                <td class="r num">{{ l.unitPrice == null ? '—' : eur.format(l.unitPrice) }}</td>
-                <td class="r">
-                  <input class="input qty" type="number" min="0" step="0.5" :value="l.qty" :aria-label="`Jours vendus : ${l.label}`" @change="setQty(l, $event)" />
-                </td>
-                <td class="r num">{{ fmtDays(l.done) }}</td>
-                <td class="r num">{{ l.planned ? fmtDays(l.planned) : '—' }}</td>
-                <td class="r num" :class="{ neg: l.remaining < 0 }">{{ fmtDays(l.remaining) }}</td>
-                <td class="meter-col">
-                  <div class="track" :title="`${fmtDays(l.done)} réalisés + ${fmtDays(l.planned)} à venir pour ${fmtDays(l.sold)} vendus`">
-                    <span class="m-done" :style="{ width: meter(l).done + '%' }" />
-                    <span class="m-planned" :style="{ width: meter(l).planned + '%' }" />
-                    <span class="m-sold" :style="{ left: meter(l).sold + '%' }" />
-                  </div>
-                </td>
-                <td class="tasks">
-                  <MultiSelect
-                    :model-value="l.tasks"
-                    :options="[...new Set([...taskOptions, ...l.tasks])]"
-                    :labelled-by="''"
-                    empty-label="Aucune tâche"
-                    @update:model-value="v => setLineTasks(offer.id, l.id, v)"
-                  />
-                </td>
-                <td>
-                  <span class="pill"><span class="badge" :style="{ background: BUDGET_STATES[l.state].color }" aria-hidden="true">{{ BUDGET_STATES[l.state].icon }}</span>{{ l.state === 'none' ? 'Aucune tâche' : BUDGET_STATES[l.state].label }}</span>
-                </td>
-              </tr>
-            </tbody>
-            <tbody v-if="cmp.unassigned.length">
-              <tr class="phase">
-                <th colspan="10">Tâches du planning non rattachées à une ligne de l'offre</th>
-              </tr>
-              <tr v-for="u in cmp.unassigned" :key="u.task" class="unassigned">
-                <td class="label">{{ u.task }}<span v-if="u.resources" class="muted sub">{{ u.resources }}</span></td>
-                <td colspan="3" class="muted">à rattacher via la colonne « Tâches du planning »</td>
-                <td class="r num">{{ fmtDays(u.done) }}</td>
-                <td class="r num">{{ u.planned ? fmtDays(u.planned) : '—' }}</td>
-                <td colspan="4"></td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="muted legend">
-          Barre : <i class="k m-done" /> réalisé · <i class="k m-planned" /> à venir · <i class="k k-line" /> jours vendus. Les tâches sont
-          rattachées automatiquement quand leur libellé correspond à celui de la prestation ; ajustez au besoin.
+        <OfferLinesTable :items="[{ offer, cmp, linked }]" editable :task-options="taskOptions" />
+        <p class="muted small">
+          Les tâches du planning sont rattachées automatiquement quand leur libellé correspond à celui de la prestation ; ajustez au besoin dans la
+          colonne « Tâches du planning ». Le même suivi, toutes offres confondues, est affiché dans le tableau de bord.
         </p>
       </section>
 

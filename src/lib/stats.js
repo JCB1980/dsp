@@ -320,21 +320,27 @@ export const BUDGET_STATES = {
 /**
  * Compare chaque ligne d'une offre (jours vendus) aux affectations du
  * planning rattachées (via les tâches associées à la ligne).
+ *
+ * Par ligne : vendus, réalisé, à venir, reste à faire (vendus − réalisé),
+ * écart prévisionnel (vendus − réalisé − à venir), les mêmes valorisés au
+ * prix unitaire de la ligne, et le coût interne (Dat_Cost) s'il est connu.
  */
 export function offerComparison(offer, linked, refDate) {
   const byTask = new Map();
   for (const e of linked) {
     const key = e.task || NONE;
     let t = byTask.get(key);
-    if (!t) byTask.set(key, (t = { done: 0, planned: 0, resources: new Set() }));
+    if (!t) byTask.set(key, (t = { done: 0, planned: 0, cost: 0, resources: new Set() }));
     if (e.date <= refDate) t.done += e.totalDays;
     else t.planned += e.totalDays;
+    t.cost += e.cost || 0;
     if (!e.unplanned) t.resources.add(e.resource);
   }
   const assigned = new Set();
   const lines = offer.lines.map(l => {
     let done = 0;
     let planned = 0;
+    let cost = 0;
     const resources = new Set();
     for (const task of l.tasks) {
       assigned.add(task);
@@ -342,10 +348,13 @@ export function offerComparison(offer, linked, refDate) {
       if (!t) continue;
       done += t.done;
       planned += t.planned;
+      cost += t.cost;
       t.resources.forEach(r => resources.add(r));
     }
     const sold = l.qty || 0;
+    const pu = l.unitPrice || 0;
     const total = done + planned;
+    const soldAmount = l.amount ?? sold * pu;
     const state = !l.tasks.length ? 'none' : done > sold ? 'over' : total > sold ? 'risk' : sold && total / sold >= 0.8 ? 'watch' : 'ok';
     return {
       ...l,
@@ -353,40 +362,49 @@ export function offerComparison(offer, linked, refDate) {
       done,
       planned,
       total,
-      remaining: sold - total,
-      soldAmount: l.amount ?? sold * (l.unitPrice || 0),
-      doneAmount: done * (l.unitPrice || 0),
+      remaining: sold - total, // écart prévisionnel
+      raf: sold - done, // reste à faire
+      soldAmount,
+      doneAmount: done * pu,
+      plannedAmount: planned * pu,
+      rafAmount: (sold - done) * pu,
+      gapAmount: (sold - total) * pu,
+      cost,
+      margin: soldAmount - cost,
       resources: [...resources].join(', '),
       state
     };
   });
   const unassigned = [...byTask.entries()]
     .filter(([task]) => !assigned.has(task))
-    .map(([task, t]) => ({ task, done: t.done, planned: t.planned, total: t.done + t.planned, resources: [...t.resources].join(', ') }))
+    .map(([task, t]) => ({ task, done: t.done, planned: t.planned, total: t.done + t.planned, cost: t.cost, resources: [...t.resources].join(', ') }))
     .sort((a, b) => b.total - a.total);
   const sum = (list, f) => list.reduce((s, x) => s + f(x), 0);
+  const KEYS = ['sold', 'done', 'planned', 'raf', 'remaining', 'soldAmount', 'doneAmount', 'plannedAmount', 'rafAmount', 'gapAmount', 'cost'];
+  const totalsOf = list => Object.fromEntries(KEYS.map(k => [k, sum(list, l => l[k])]));
   const phases = [];
   for (const l of lines) {
     let p = phases.find(x => x.name === l.phase);
     if (!p) phases.push((p = { name: l.phase, lines: [] }));
     p.lines.push(l);
   }
-  for (const p of phases) {
-    p.sold = sum(p.lines, l => l.sold);
-    p.done = sum(p.lines, l => l.done);
-    p.planned = sum(p.lines, l => l.planned);
-  }
+  for (const p of phases) Object.assign(p, totalsOf(p.lines));
+  const lineTotals = totalsOf(lines);
   return {
     phases,
     lines,
     unassigned,
+    hasCost: linked.some(e => e.cost > 0),
     totals: {
-      sold: sum(lines, l => l.sold),
-      soldAmount: sum(lines, l => l.soldAmount),
+      ...lineTotals,
+      // Réalisé / à venir : toutes les affectations rattachées, y compris hors offre.
       done: sum(linked.filter(e => e.date <= refDate), e => e.totalDays),
       planned: sum(linked.filter(e => e.date > refDate), e => e.totalDays),
-      doneAmount: sum(lines, l => l.doneAmount),
-      unassigned: sum(unassigned, u => u.total)
+      linesDone: lineTotals.done,
+      linesPlanned: lineTotals.planned,
+      unassigned: sum(unassigned, u => u.total),
+      unassignedCost: sum(unassigned, u => u.cost),
+      cost: lineTotals.cost + sum(unassigned, u => u.cost)
     }
   };
 }
