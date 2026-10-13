@@ -1,0 +1,24 @@
+{
+  "name": "dsp-suivi-jours-projets",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Suivi de la consommation des jours projets (export PlanningPME), utilisable en local dans le navigateur.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node scripts/copy-dist.js",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.11",
+    "vite-plugin-singlefile": "^2.0.3",
+    "vitest": "^2.1.8"
+  }
+}
