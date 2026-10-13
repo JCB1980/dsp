@@ -60,6 +60,10 @@ const cols = computed(() => 10 + (showMoney.value ? 5 : 0) + (hasCost.value ? 2 
 function issues({ offer, cmp, linked }) {
   const out = [];
   const who = offer.info.clientShort || offer.info.client || 'ce client';
+  const names = [...new Set((linked || []).map(e => e.task).filter(Boolean))];
+  const tasked = cmp.lines.filter(l => l.tasks.length);
+  if (linked?.length && tasked.length && tasked.every(l => !l.done && !l.planned))
+    out.push(`Les tâches rattachées ne correspondent à aucune affectation du planning importé. Cliquez sur « Rattacher automatiquement » dans l'onglet Offres. Tâches disponibles : ${names.slice(0, 6).join(' ; ')}${names.length > 6 ? ' …' : ''}.`);
   if (!offer.link?.values?.length) out.push(`Offre non rattachée au planning : choisissez le client (ou le projet) correspondant à « ${who} » dans l'onglet Offres.`);
   else if (!linked?.length) out.push(`Aucune affectation du planning pour « ${offer.link.values.join(', ')} » : vérifiez que l'export PlanningPME couvre ce client et la période du projet.`);
   else {

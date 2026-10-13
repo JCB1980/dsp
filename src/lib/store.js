@@ -209,6 +209,17 @@ function autoAssignTasks(offer) {
 }
 
 /**
+ * Retire des lignes les tâches qui n'existent plus dans le planning (ancien
+ * import, nom modifié), puis rattache à nouveau les lignes vides. Sans
+ * effet si l'offre n'a encore aucune affectation : on ne perd rien.
+ */
+function pruneAndAssign(offer) {
+  const existing = new Set(offerEntries(offer).map(e => e.task).filter(Boolean));
+  if (existing.size) for (const l of offer.lines) l.tasks = l.tasks.filter(t => existing.has(t));
+  autoAssignTasks(offer);
+}
+
+/**
  * Offre jointe avant l'import du planning (ou client renommé) : on retente
  * de la rattacher au client, puis au projet, du planning.
  */
@@ -229,7 +240,7 @@ export async function refreshOfferLinks() {
   if (!state.offers.length || !entries.value.length) return;
   for (const o of state.offers) {
     relinkOffer(o);
-    autoAssignTasks(o);
+    pruneAndAssign(o);
   }
   await saveOffers();
 }
@@ -238,7 +249,7 @@ export async function refreshOfferLinks() {
 export function autoLink(id) {
   return updateOffer(id, o => {
     relinkOffer(o);
-    autoAssignTasks(o);
+    pruneAndAssign(o);
   });
 }
 
@@ -286,7 +297,7 @@ export async function updateOffer(id, mutate) {
 export function setOfferLink(id, level, values) {
   return updateOffer(id, o => {
     o.link = { level, values };
-    autoAssignTasks(o);
+    pruneAndAssign(o);
   });
 }
 
