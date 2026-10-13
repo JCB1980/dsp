@@ -4,9 +4,9 @@ import { toCsv, csvNumber } from './exportCsv.js';
 /** CSV du suivi par ligne d'offre (une ou plusieurs offres). */
 export function offerLinesCsv(items) {
   const header = [
-    'Client / offre', 'Phase', 'Prestation', 'Profil', 'P.U. (€ HT)',
-    'Jours vendus', 'Réalisé (j)', 'À venir (j)', 'Reste à faire (j)', 'Écart prévisionnel (j)',
-    'Montant vendu (€ HT)', 'Réalisé (€ HT)', 'À venir (€ HT)', 'Reste à faire (€ HT)', 'Écart prévisionnel (€ HT)',
+    'Client / offre', 'Phase', 'Prestation', 'Profil', 'TJM offre (€ HT)',
+    'Jours vendus', 'Consommé (j)', 'À venir (j)', 'Reste à faire (j)', 'Écart prévisionnel (j)',
+    'Vendu (€ HT)', 'Coût consommé (€ HT)', 'Coût à venir (€ HT)', 'Reste à faire (€ HT)', 'Écart prévisionnel (€ HT)',
     'Coût interne (€)', 'Marge (€)', 'Tâches du planning', 'Consultants', 'État'
   ];
   const rows = [];

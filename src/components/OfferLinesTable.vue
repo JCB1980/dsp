@@ -37,6 +37,15 @@ function meter(l) {
   const scale = Math.max(l.sold, l.total) || 1;
   return { done: (l.done / scale) * 100, planned: (l.planned / scale) * 100, sold: (l.sold / scale) * 100 };
 }
+function setTjm(offer, line, ev) {
+  const v = Number(String(ev.target.value).replace(',', '.'));
+  if (!Number.isFinite(v) || v < 0) return;
+  updateOffer(offer.id, o => {
+    const l = o.lines.find(x => x.id === line.id);
+    l.unitPrice = v;
+    l.amount = (l.qty || 0) * v;
+  });
+}
 function setQty(offer, line, ev) {
   const v = Number(String(ev.target.value).replace(',', '.'));
   if (!Number.isFinite(v) || v < 0) return;
@@ -53,10 +62,10 @@ const stateLabel = l => (l.state === 'none' ? 'Aucune tâche' : BUDGET_STATES[l.
 <template>
   <div class="olt">
     <div class="opts">
-      <label class="check"><input v-model="showMoney" type="checkbox" /> Afficher les montants (€ HT)</label>
+      <label class="check"><input v-model="showMoney" type="checkbox" /> Afficher les coûts (€ HT)</label>
       <span class="muted">
-        <strong>Reste à faire</strong> = vendus − réalisé · <strong>Écart prévisionnel</strong> = vendus − (réalisé + à venir) · montants au prix unitaire de
-        la ligne<template v-if="hasCost"> · <strong>coût interne</strong> = coût des ressources calculé par PlanningPME</template>
+        <strong>Coûts</strong> = jours × <strong>TJM de la ligne</strong> (repris de l'offre) · <strong>Reste à faire</strong> = vendus − consommé ·
+        <strong>Écart prévisionnel</strong> = vendus − (consommé + à venir)<template v-if="hasCost"> · <strong>coût interne</strong> = coût des ressources calculé par PlanningPME</template>
       </span>
     </div>
     <div class="table-wrap">
@@ -65,22 +74,22 @@ const stateLabel = l => (l.state === 'none' ? 'Aucune tâche' : BUDGET_STATES[l.
           <tr class="groups">
             <th colspan="3"></th>
             <th colspan="5" class="grp">Jours</th>
-            <th v-if="showMoney" colspan="5" class="grp">Montants € HT</th>
+            <th v-if="showMoney" colspan="5" class="grp">Coûts au TJM de l'offre (€ HT)</th>
             <th v-if="hasCost" colspan="2" class="grp">Coût interne</th>
             <th :colspan="editable ? 3 : 2"></th>
           </tr>
           <tr>
             <th class="first">Prestation</th>
             <th>Profil</th>
-            <th class="r">P.U.</th>
+            <th class="r" title="Taux journalier moyen de la ligne, repris de l'offre (colonne P.U.)">TJM</th>
             <th class="r">Vendus</th>
-            <th class="r">Réalisé</th>
+            <th class="r">Consommé</th>
             <th class="r">À venir</th>
             <th class="r">Reste à faire</th>
             <th class="r">Écart prév.</th>
             <template v-if="showMoney">
               <th class="r">Vendu</th>
-              <th class="r">Réalisé</th>
+              <th class="r">Consommé</th>
               <th class="r">À venir</th>
               <th class="r">Reste à faire</th>
               <th class="r">Écart prév.</th>
@@ -149,7 +158,20 @@ const stateLabel = l => (l.state === 'none' ? 'Aucune tâche' : BUDGET_STATES[l.
                 <span v-if="l.resources" class="muted sub">{{ l.resources }}</span>
               </td>
               <td>{{ l.profile }}</td>
-              <td class="r num">{{ l.unitPrice == null ? '—' : money(l.unitPrice) }}</td>
+              <td class="r num">
+                <input
+                  v-if="editable"
+                  class="input qty tjm"
+                  type="number"
+                  min="0"
+                  step="10"
+                  :value="l.unitPrice ?? ''"
+                  :aria-label="`TJM : ${l.label}`"
+                  title="TJM repris de l'offre ; modifiable (avenant…)"
+                  @change="setTjm(offer, l, $event)"
+                />
+                <template v-else>{{ l.unitPrice == null ? '—' : money(l.unitPrice) }}</template>
+              </td>
               <td class="r">
                 <input v-if="editable" class="input qty" type="number" min="0" step="0.5" :value="l.qty" :aria-label="`Jours vendus : ${l.label}`" @change="setQty(offer, l, $event)" />
                 <span v-else class="num">{{ days(l.sold) }}</span>
@@ -358,6 +380,9 @@ tfoot td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.tjm {
+  width: 86px;
 }
 .qty {
   width: 70px;

@@ -85,7 +85,7 @@ const periodLabel = computed(() => {
     <section v-if="state.offers.length" class="card offers-card">
       <header class="oc-head">
         <div>
-          <h3>Suivi par ligne d'offre : jours vendus, planifiés, reste à faire et montants</h3>
+          <h3>Suivi par ligne d'offre : jours vendus, planifiés, reste à faire et coûts au TJM de l'offre</h3>
           <p class="muted sub">
             {{ tracking.length }} offre(s) · sur toute la durée de l'affaire (la période ne s'applique pas) · filtres Client / Projet / Commande pris en
             compte · réalisé au {{ formatDate(refDate) }}
@@ -98,7 +98,7 @@ const periodLabel = computed(() => {
       </header>
       <div v-if="tracking.length" class="oc-kpis">
         <div><span class="muted">Jours vendus</span><strong>{{ fmtDays(offerKpis.sold) }}</strong><span class="muted">{{ eur.format(offerKpis.soldAmount) }}</span></div>
-        <div><span class="muted">Réalisé</span><strong>{{ fmtDays(offerKpis.done) }}</strong><span class="muted">{{ offerKpis.sold ? pf.format(offerKpis.done / offerKpis.sold) : '' }} du vendu</span></div>
+        <div><span class="muted">Consommé</span><strong>{{ fmtDays(offerKpis.done) }}</strong><span class="muted">{{ offerKpis.sold ? pf.format(offerKpis.done / offerKpis.sold) : '' }} du vendu</span></div>
         <div><span class="muted">À venir</span><strong>{{ fmtDays(offerKpis.planned) }}</strong></div>
         <div><span class="muted">Reste à faire</span><strong>{{ fmtDays(offerKpis.raf) }}</strong><span class="muted">{{ eur.format(offerKpis.rafAmount) }}</span></div>
         <div>
